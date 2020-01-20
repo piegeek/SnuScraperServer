@@ -2,11 +2,15 @@ const express = require('express');
 const router = express.Router();
 const MongoClient = require('mongodb').MongoClient;
 const ObjectID = require('mongodb').ObjectID;
+const admin = require('firebase-admin');
 let db;
 
 // DATABASE RELATED STRINGS
 const databaseUri = 'mongodb://localhost:27017';
 const databaseName = 'SSLT2019WINTER' 
+
+// FIREBASE DATABASE URL
+const firebaseDatabaseUrl = 'https://snuscraper-fb1be.firebaseio.com';
 
 // DATABASE CONNECTION
 MongoClient.connect(databaseUri, {useUnifiedTopology: true}, (err, client) => {
@@ -15,6 +19,12 @@ MongoClient.connect(databaseUri, {useUnifiedTopology: true}, (err, client) => {
         return;
     }
     db = client.db(databaseName);
+});
+
+// INITIALIZE FIREBASE SDK
+admin.initializeApp({
+    credential: admin.credential.applicationDefault(),
+    databaseURL: firebaseDatabaseUrl
 });
 
 router.get('/title/:title', (req, res) => {
@@ -54,6 +64,22 @@ router.post('/delete/', (req, res) => {
     .catch(err => {
         console.log(`Error while deleting user('id': ${req.body.userId}) from lecture('id': ${req.body.lectureId}) `);
     })
+});
+
+router.post('/test/', async (req, res) => {
+    const message = {
+        notification: {
+            body: 'Body of notification',
+            title: 'Title of notification'
+        },
+        token: String(req.body.userId)
+    };
+    
+    try {
+        const response = await admin.messaging().send(message);
+        console.log('Successfully sent message: ', response);
+    }
+    catch(err) { console.error(err); }
 });
 
 module.exports = router;
