@@ -12,4 +12,4 @@ app.use('/api/lectures', require('./routes/api/lectures'));
 
 // PORT SETUP
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log('Server Started'));
+app.listen(PORT, () => console.log('Server Started')); 
