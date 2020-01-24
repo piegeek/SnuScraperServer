@@ -3,3 +3,6 @@ node_modules/
 
 # config dir
 config/
+
+# log files
+*.log
