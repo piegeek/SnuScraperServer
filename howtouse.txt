@@ -1,0 +1,6 @@
+After deployment,
+
+1. npm install
+2. mkdir log
+3. touch config.js
+4. add correct configuration data
