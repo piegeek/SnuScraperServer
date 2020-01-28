@@ -1,3 +1,4 @@
+const path = require('path');
 const express = require('express');
 const router = express.Router();
 const MongoClient = require('mongodb').MongoClient;
@@ -28,8 +29,8 @@ const logger = winston.createLogger({
     ),
     defaultMeta: { service: 'user-service' },
     transports: [
-        new winston.transports.File({ filename: './../../log/error/error.log', level: 'error' }),
-        new winston.transports.File({ filename: './../../log/activity/combined.log' })
+        new winston.transports.File({ filename: path.join(__dirname, '../log/error/error.log'), level: 'error' }),
+        new winston.transports.File({ filename: path.join(__dirname, '../log/activity/combined.log') })
     ]
 }); 
 
