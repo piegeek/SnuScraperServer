@@ -3,11 +3,13 @@ const router = express.Router();
 const MongoClient = require('mongodb').MongoClient;
 const ObjectID = require('mongodb').ObjectID;
 const winston = require('winston');
+const config = require('../../config');
+
 let db;
 
 // DATABASE RELATED STRINGS
-const databaseUri = 'mongodb://localhost:27017';
-const databaseName = 'SSLT2019WINTER' 
+const databaseUri = config.databaseUri;
+const databaseName = config.databaseName 
 
 // DATABASE CONNECTION
 MongoClient.connect(databaseUri, {useUnifiedTopology: true}, (err, client) => {

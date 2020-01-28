@@ -6,3 +6,6 @@ config/
 
 # log files
 *.log
+
+# config
+config.js
