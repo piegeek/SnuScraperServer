@@ -76,6 +76,24 @@ router.get('/code/:code', async (req, res) => {
     }
 });
 
+router.get('/lectureId/:lectureId', async (req, res) => {
+    try {
+        const lecture = await db.collection('lectures').find({ '_id': new ObjectID(req.params.lectureId) })
+        if (!lecture) {
+            res.sendStatus(400);
+            logger.log({ level: 'error', message: `Cant find lecture with lectureID: ${req.params.lectureId}.` });
+        }
+        else {
+            res.json(lecture);
+            logger.log({ level: 'info', message: `Success for lectureId: ${req.params.lectureId}` });
+        }
+    }
+    catch(err) {
+        res.sendStatus(400);
+        logger.log({ level: 'error', message: `DATABASE ERROR! CHECK IF SERVER IS CONNECTED TO THE DATABASE.` });
+    }
+});
+
 router.post('/', async (req, res) => {
     try {
         await db.collection('lectures').updateOne(
