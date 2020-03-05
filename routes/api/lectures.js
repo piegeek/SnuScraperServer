@@ -78,7 +78,7 @@ router.get('/code/:code', async (req, res) => {
 
 router.get('/lectureId/:lectureId', async (req, res) => {
     try {
-        const lecture = await db.collection('lectures').find({ '_id': new ObjectID(req.params.lectureId) })
+        const lecture = await db.collection('lectures').find({ '_id': new ObjectID(req.params.lectureId) }).toArray();
         if (!lecture) {
             res.sendStatus(400);
             logger.log({ level: 'error', message: `Cant find lecture with lectureID: ${req.params.lectureId}.` });
