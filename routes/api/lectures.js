@@ -5,6 +5,7 @@ const MongoClient = require('mongodb').MongoClient;
 const ObjectID = require('mongodb').ObjectID;
 const winston = require('winston');
 const config = require('../../config');
+const asyncLog = require('../../asyncLog');
 
 let db;
 
@@ -42,17 +43,17 @@ router.get('/title/:title', async (req, res) => {
         lecturesToSend = lectures.filter(item => item['교과목명'].split(' ').join('') === cleanedTitleData);
 
         if (lecturesToSend.length === 0) {
-            logger.log({ level: 'error', message: `Fail for TITLE: ${req.params.title}, CLEANED_TITLE: ${cleanedTitleData}` });
             res.sendStatus(400);
+            await asyncLog(logger, 'error', `Fail for TITLE: ${req.params.title}, CLEANED_TITLE: ${cleanedTitleData}`);
         }
         else {
-            logger.log({ level: 'info', message: `Success for TITLE: ${req.params.title}` });
             res.json(lecturesToSend);
+            await asyncLog(logger, 'info', `Success for TITLE: ${req.params.title}`);
         }
     }
     catch(err) {
-        logger.log({ level: 'error', message: `DATABASE ERROR! CHECK IF SERVER IS CONNECTED TO THE DATABASE.` });
         res.sendStatus(400);
+        await asyncLog(logger, 'error', `DATABASE ERROR! CHECK IF SERVER IS CONNECTED TO THE DATABASE.`);
     }
 });
 
@@ -62,17 +63,17 @@ router.get('/code/:code', async (req, res) => {
         
         const lectures = await db.collection('lectures').find({ '교과목번호': cleanedCodeData }).toArray();
         if (lectures.length === 0) {
-            logger.log({ level: 'error', message: `Fail for CODE: ${req.params.code}, CLEANED_CODE: ${cleanedCodeData}` });
             res.sendStatus(400);
+            await asyncLog(logger, 'error', `Fail for CODE: ${req.params.code}, CLEANED_CODE: ${cleanedCodeData}`);
         }
         else {
-            logger.log({ level: 'info', message: `Success for CODE: ${req.params.code}` });
             res.json(lectures);
+            await asyncLog(logger, 'info', `Success for CODE: ${req.params.code}`);
         }
     }
     catch(err) {
-        logger.log({ level: 'error', message: `DATABASE ERROR! CHECK IF SERVER IS CONNECTED TO THE DATABASE.` });
         res.sendStatus(400);
+        await asyncLog(logger, 'error', `DATABASE ERROR! CHECK IF SERVER IS CONNECTED TO THE DATABASE.`);
     }
 });
 
@@ -81,16 +82,16 @@ router.get('/lectureId/:lectureId', async (req, res) => {
         const lecture = await db.collection('lectures').find({ '_id': new ObjectID(req.params.lectureId) }).toArray();
         if (!lecture) {
             res.sendStatus(400);
-            logger.log({ level: 'error', message: `Cant find lecture with lectureID: ${req.params.lectureId}.` });
+            await asyncLog(logger, 'error', `Cant find lecture with lectureID: ${req.params.lectureId}.`);
         }
         else {
             res.json(lecture);
-            logger.log({ level: 'info', message: `Success for lectureId: ${req.params.lectureId}` });
+            await asyncLog(logger, 'info', `Success for lectureId: ${req.params.lectureId}`);
         }
     }
     catch(err) {
         res.sendStatus(400);
-        logger.log({ level: 'error', message: `DATABASE ERROR! CHECK IF SERVER IS CONNECTED TO THE DATABASE.` });
+        await asyncLog(logger, 'error', `DATABASE ERROR! CHECK IF SERVER IS CONNECTED TO THE DATABASE.`);
     }
 });
 
@@ -101,13 +102,13 @@ router.post('/', async (req, res) => {
             { '$addToSet': { 'users': String(req.body.userId) } },
         );
         
-        logger.log({ level: 'info', message: `Successfully added user('id': ${req.body.userId}) to lecture('id': ${req.body.lectureId})` });
         res.sendStatus(200);
+        await asyncLog(logger, 'info', `Successfully added user('id': ${req.body.userId}) to lecture('id': ${req.body.lectureId})`);
     }
     catch(err) {
-        logger.log({ level: 'error', message: `Error while adding user('id': ${req.body.userId}) to lecture('id': ${req.body.lectureId})` });
-        logger.log({ level: 'error', message: `Error message: ${err}` });
         res.sendStatus(400);
+        await asyncLog(logger, 'error', `Error while adding user('id': ${req.body.userId}) to lecture('id': ${req.body.lectureId})`);
+        await asyncLog(logger, 'error', `Error message: ${err}`);
     }
 });
 
@@ -117,14 +118,13 @@ router.post('/delete/', async (req, res) => {
             { '_id': new ObjectID(req.body.lectureId) },
             { '$pull': { 'users': String(req.body.userId) } }
         );
-
-        logger.log({ level: 'info', message: `Successfully deleted user('id': ${req.body.userId}) from lecture('id': ${req.body.lectureId})` });
         res.sendStatus(200);
+        await asyncLog(logger, 'info', `Successfully deleted user('id': ${req.body.userId}) from lecture('id': ${req.body.lectureId})`);
     }
     catch(err) {
-        logger.log({ level: 'error', message: `Error while deleting user('id': ${req.body.userId}) from lecture('id': ${req.body.lectureId})` });
-        logger.log({ level: 'error', message: `Error message: ${err}` });        
         res.sendStatus(400);
+        await asyncLog(logger, 'error', `Error while deleting user('id': ${req.body.userId}) from lecture('id': ${req.body.lectureId})`);
+        await asyncLog(logger, 'error', `Error message: ${err}`);    
     }
 });
 
