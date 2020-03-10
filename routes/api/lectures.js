@@ -35,12 +35,30 @@ const logger = winston.createLogger({
     ]
 }); 
 
-router.get('/title/:title', async (req, res) => {
+router.get('/title/:title', async (req, res, next) => {
     try {                        
+        const lectures = await db.collection('lectures').find({ '교과목명': new RegExp(req.params.title) }).toArray();
+
+        if (lectures.length === 0) {
+            next();
+        }
+        else {
+            res.json(lectures);
+            await asyncLog(logger, 'info', `Success for TITLE: ${req.params.title}`);
+        }
+    }
+    catch(err) {
+        res.sendStatus(400);
+        await asyncLog(logger, 'error', `DATABASE ERROR! CHECK IF SERVER IS CONNECTED TO THE DATABASE.`);
+    }
+});
+
+router.get('/title/:title', async (req, res) => {
+    try {
         const lectures = await db.collection('lectures').find().toArray();
         
-        const cleanedTitleData = req.params.title.split(' ').join('');
-        lecturesToSend = lectures.filter(item => item['교과목명'].split(' ').join('') === cleanedTitleData);
+        const cleanedTitleData = new RegExp(req.params.title.split(' ').join(''));
+        const lecturesToSend = lectures.filter(item => cleanedTitleData.test(item['교과목명'].split(' ').join('')) === true);
 
         if (lecturesToSend.length === 0) {
             res.sendStatus(400);
