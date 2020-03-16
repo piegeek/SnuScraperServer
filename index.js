@@ -9,6 +9,7 @@ app.use(express.urlencoded({ extended: false }));
 
 // ROUTE SETUP
 app.use('/api/lectures', require('./routes/api/lectures'));
+app.use('/api/users', require('./routes/api/users'));
 
 // PORT SETUP
 const PORT = process.env.PORT || 5000;

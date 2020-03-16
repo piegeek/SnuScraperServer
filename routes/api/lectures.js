@@ -36,6 +36,7 @@ const logger = winston.createLogger({
 }); 
 
 router.get('/title/:title', async (req, res, next) => {
+    // Query without manipulating user input (eg: 수학, 수학 1)
     try {                        
         const lectures = await db.collection('lectures').find({ '교과목명': new RegExp(req.params.title) }).toArray();
 
@@ -54,6 +55,7 @@ router.get('/title/:title', async (req, res, next) => {
 });
 
 router.get('/title/:title', async (req, res) => {
+    // Query for when the user didn't put spaces at the right place (eg: 수학1)
     try {
         const lectures = await db.collection('lectures').find().toArray();
         
