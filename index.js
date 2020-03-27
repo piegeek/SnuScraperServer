@@ -8,9 +8,9 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 // ROUTE SETUP
-app.use('/api/lectures', require('./routes/api/lectures'));
+app.use('/api/lectures', require('./routes/api/lecturesLegacy')); // Deprecated
 app.use('/api/users', require('./routes/api/users'));
-app.use('/api/lectures1', require('./routes/api/lectures1'));
+app.use('/api/registered/lectures/', require('./routes/api/lectures'));
 
 // PORT SETUP
 const PORT = process.env.PORT || 5000;

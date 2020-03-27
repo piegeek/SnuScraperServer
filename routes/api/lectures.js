@@ -1,24 +1,20 @@
 const path = require('path');
 const express = require('express');
 const router = express.Router();
-const MongoClient = require('mongodb').MongoClient;
-const ObjectID = require('mongodb').ObjectID;
 const winston = require('winston');
+
+const { Pool } = require('pg');
+
 const config = require('../../config');
 const asyncLog = require('../../asyncLog');
+const checkJWT = require('../../middleware/checkJWT');
 
-let db;
-
-// DATABASE RELATED STRINGS
-const databaseUri = config.databaseUri;
-const databaseName = config.databaseName 
-
-// DATABASE CONNECTION
-MongoClient.connect(databaseUri, {useUnifiedTopology: true}, (err, client) => {
-    if (err) {
-        throw err;
-    }
-    db = client.db(databaseName);
+const pool = new Pool({
+    user: config.databaseUsername,
+    host: config.databaseHost,
+    database: config.databaseIdentity,
+    password: config.databasePassword,
+    port: config.databasePort
 });
 
 // CREATE LOGGER
@@ -35,118 +31,134 @@ const logger = winston.createLogger({
     ]
 }); 
 
-router.get('/title/:title', async (req, res, next) => {
+router.get('/title/:year/:season/:title', async (req, res, next) => {
     // Query without manipulating user input (eg: 수학, 수학 1)
-    try {                        
-        const lectures = await db.collection('lectures').find({ '교과목명': new RegExp(req.params.title) }).toArray();
+    const client = await pool.connect();
+    
+    try {
+        const queryText = "SELECT * FROM lectures WHERE year = $1 AND season = $2 AND 교과목명 LIKE $3";
+        const lectures = await client.query(queryText, [req.params.year, req.params.season, `%${req.params.title}%`]);
+        const lecturesToSend = lectures.rows;
 
-        if (lectures.length === 0) {
+        if (lecturesToSend.length === 0) {
             next();
         }
         else {
-            res.json(lectures);
-            await asyncLog(logger, 'info', `Success for TITLE: ${req.params.title}`);
+            res.json(lecturesToSend);
+            await asyncLog(logger, 'info', `SUCCESS ${decodeURI(req.originalUrl)} ${req.ip}`);
         }
+
     }
     catch(err) {
         res.sendStatus(400);
-        await asyncLog(logger, 'error', `DATABASE ERROR! CHECK IF SERVER IS CONNECTED TO THE DATABASE.`);
+        await asyncLog(logger, 'error', `FAIL ${decodeURI(req.originalUrl)} ${req.ip} => DATABASE ISSUE`);
     }
+    
+    client.release();
 });
 
-router.get('/title/:title', async (req, res) => {
+router.get('/title/:year/:season/:title', async (req, res) => {
     // Query for when the user didn't put spaces at the right place (eg: 수학1)
+    const client = await pool.connect();
+    
     try {
-        const lectures = await db.collection('lectures').find().toArray();
-        
+        const queryText = 'SELECT * FROM lectures WHERE year = $1 AND season = $2';
+        const lectures = await client.query(queryText, [req.params.year, req.params.season]);
+
         const cleanedTitleData = new RegExp(req.params.title.split(' ').join(''));
-        const lecturesToSend = lectures.filter(item => cleanedTitleData.test(item['교과목명'].split(' ').join('')) === true);
+        const lecturesToSend = lectures.rows.filter(item => item['교과목명'] && cleanedTitleData.test(item['교과목명'].split(' ').join('')) === true);
 
         if (lecturesToSend.length === 0) {
             res.sendStatus(400);
-            await asyncLog(logger, 'error', `Fail for TITLE: ${req.params.title}, CLEANED_TITLE: ${cleanedTitleData}`);
+            await asyncLog(logger, 'error', `FAIL ${decodeURI(req.originalUrl)} ${req.ip} => CAN'T FIND LECTURE`);
         }
         else {
             res.json(lecturesToSend);
-            await asyncLog(logger, 'info', `Success for TITLE: ${req.params.title}`);
+            await asyncLog(logger, 'info', `SUCCESS ${decodeURI(req.originalUrl)} ${req.ip}`);
         }
+
     }
     catch(err) {
         res.sendStatus(400);
-        await asyncLog(logger, 'error', `DATABASE ERROR! CHECK IF SERVER IS CONNECTED TO THE DATABASE.`);
+        await asyncLog(logger, 'error', `FAIL ${decodeURI(req.originalUrl)} ${req.ip}=> DATABASE ISSUE`);
     }
+    
+    client.release();
 });
 
-router.get('/code/:code', async (req, res) => {
+router.get('/code/:year/:season/:code', async (req, res) => {
+    const client = await pool.connect();
+
     try {
-        const cleanedCodeData = req.params.code.split(' ').join('').toUpperCase();
-        
-        const lectures = await db.collection('lectures').find({ '교과목번호': cleanedCodeData }).toArray();
-        if (lectures.length === 0) {
+        const cleanedCodeData = req.params.code.trim();
+        const queryText = 'SELECT * FROM lectures WHERE year = $1 AND season = $2 AND 교과목번호 = $3';
+        const lectures = await client.query(queryText, [req.params.year, req.params.season, cleanedCodeData]);
+        const lecturesToSend = lectures.rows;
+
+        if (lecturesToSend.length == 0) {
             res.sendStatus(400);
-            await asyncLog(logger, 'error', `Fail for CODE: ${req.params.code}, CLEANED_CODE: ${cleanedCodeData}`);
+            await asyncLog(logger, 'error', `FAIL ${decodeURI(req.originalUrl)} ${req.ip} => CAN'T FIND LECTURE`);
         }
         else {
-            res.json(lectures);
-            await asyncLog(logger, 'info', `Success for CODE: ${req.params.code}`);
+            res.json(lecturesToSend);
+            await asyncLog(logger, 'info', `SUCCESS ${decodeURI(req.originalUrl)} ${req.ip}`);
         }
+
     }
     catch(err) {
         res.sendStatus(400);
-        await asyncLog(logger, 'error', `DATABASE ERROR! CHECK IF SERVER IS CONNECTED TO THE DATABASE.`);
+        await asyncLog(logger, 'error', `FAIL ${decodeURI(req.originalUrl)} ${req.ip} => DATABASE ISSUE`);
     }
+
+    client.release();
 });
 
-router.get('/lectureId/:lectureId', async (req, res) => {
+router.post('/add/', checkJWT, async (req, res) => {
+    const client = await pool.connect();
+
     try {
-        const lecture = await db.collection('lectures').find({ '_id': new ObjectID(req.params.lectureId) }).toArray();
-        if (!lecture) {
+        // TODO: MAKE SURE username ATTRIBUTE ALLOWS NO DUPLICATES
+        const users = await client.query('SELECT * FROM users WHERE username = $1 LIMIT 1', [req.body.username]);
+        const foundUser = users.rows[0];
+
+        if (!foundUser) {
             res.sendStatus(400);
-            await asyncLog(logger, 'error', `Cant find lecture with lectureID: ${req.params.lectureId}.`);
         }
         else {
-            res.json(lecture);
-            await asyncLog(logger, 'info', `Success for lectureId: ${req.params.lectureId}`);
+            const insertQueryText = 'INSERT INTO registered(user_id, lecture_id) VALUES($1, $2)';
+            await client.query(insertQueryText, [foundUser.id, req.body.lectureId]);
+            res.sendStatus(200);
         }
     }
     catch(err) {
         res.sendStatus(400);
-        await asyncLog(logger, 'error', `DATABASE ERROR! CHECK IF SERVER IS CONNECTED TO THE DATABASE.`);
+        // TODO: Remove use of arrow in logs, use default error message instead of custom
+        await asyncLog(logger, 'error', `FAIL ${decodeURI(req.originalUrl)} ${req.ip} => DATABASE ISSUE`);
     }
+
+    client.release();
 });
 
-router.post('/', async (req, res) => {
+router.post('/delete/', checkJWT, async (req, res) => {
+    const client = await pool.connect();
+
     try {
-        await db.collection('lectures').updateOne(
-            { '_id': new ObjectID(req.body.lectureId) },
-            { '$addToSet': { 'users': String(req.body.userId) } },
-        );
-        
-        res.sendStatus(200);
-        await asyncLog(logger, 'info', `Successfully added user('id': ${req.body.userId}) to lecture('id': ${req.body.lectureId})`);
+        const users = await client.query('SELECT * FROM users WHERE username = $1 LIMIT 1', [req.body.username]);
+        const foundUser = users.rows[0];
+
+        if (!foundUser) {
+            res.sendStatus(400);
+        }
+        else {
+            const deleteQueryText = 'DELETE FROM registered WHERE user_id = $1 AND lecture_id = $2';
+            client.query(deleteQueryText, [foundUser.id, req.body.lectureId]);
+            res.sendStatus(200);
+        }
+
     }
     catch(err) {
         res.sendStatus(400);
-        await asyncLog(logger, 'error', `Error while adding user('id': ${req.body.userId}) to lecture('id': ${req.body.lectureId})`);
-        await asyncLog(logger, 'error', `Error message: ${err}`);
     }
 });
-
-router.post('/delete/', async (req, res) => {
-    try {
-        await db.collection('lectures').updateOne(
-            { '_id': new ObjectID(req.body.lectureId) },
-            { '$pull': { 'users': String(req.body.userId) } }
-        );
-        res.sendStatus(200);
-        await asyncLog(logger, 'info', `Successfully deleted user('id': ${req.body.userId}) from lecture('id': ${req.body.lectureId})`);
-    }
-    catch(err) {
-        res.sendStatus(400);
-        await asyncLog(logger, 'error', `Error while deleting user('id': ${req.body.userId}) from lecture('id': ${req.body.lectureId})`);
-        await asyncLog(logger, 'error', `Error message: ${err}`);    
-    }
-});
-
 
 module.exports = router;
