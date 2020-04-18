@@ -31,6 +31,14 @@ const logger = winston.createLogger({
     ]
 }); 
 
+router.get('/season-year/', (req, res) => {
+    res.json({
+       season: config.season,
+       year: config.year 
+    });
+    console.log(config.season, config.year);
+});
+
 router.get('/title/:year/:season/:title', async (req, res, next) => {
     // Query without manipulating user input (eg: 수학, 수학 1)
     const client = await pool.connect();
