@@ -11,7 +11,8 @@ let db;
 
 // DATABASE RELATED STRINGS
 const databaseUri = config.databaseUri;
-const databaseName = config.databaseName 
+const databaseName = config.databaseName;
+const legacyDatabaseNames = config.legacyDatabaseNames;
 
 // DATABASE CONNECTION
 MongoClient.connect(databaseUri, {useUnifiedTopology: true}, (err, client) => {
@@ -19,6 +20,7 @@ MongoClient.connect(databaseUri, {useUnifiedTopology: true}, (err, client) => {
         throw err;
     }
     db = client.db(databaseName);
+    legacyDBs = legacyDatabaseNames.map(dbName => client.db(dbName));
 });
 
 // CREATE LOGGER
@@ -132,12 +134,29 @@ router.post('/', async (req, res) => {
     }
 });
 
-router.post('/delete/', async (req, res) => {
+router.post('/delete/', async (req, res, next) => {
     try {
         await db.collection('lectures').updateOne(
             { '_id': new ObjectID(req.body.lectureId) },
             { '$pull': { 'users': String(req.body.userId) } }
         );
+        next();
+    }
+    catch(err) {
+        res.sendStatus(400);
+        await asyncLog(logger, 'error', `Error while deleting user('id': ${req.body.userId}) from lecture('id': ${req.body.lectureId})`);
+        await asyncLog(logger, 'error', `Error message: ${err}`);    
+    }
+});
+
+router.post('/delete/', async (req, res) => {
+    try {
+        legacyDBs.forEach(async db => {
+            await db.collection('lectures').updateOne(
+                { '_id': new ObjectID(req.body.lectureId) },
+                { '$pull': { 'users': String(req.body.userId) } }
+            );
+        });
         res.sendStatus(200);
         await asyncLog(logger, 'info', `Successfully deleted user('id': ${req.body.userId}) from lecture('id': ${req.body.lectureId})`);
     }
@@ -147,6 +166,5 @@ router.post('/delete/', async (req, res) => {
         await asyncLog(logger, 'error', `Error message: ${err}`);    
     }
 });
-
 
 module.exports = router;
