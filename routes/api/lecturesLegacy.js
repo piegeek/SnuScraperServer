@@ -99,9 +99,31 @@ router.get('/code/:code', async (req, res) => {
     }
 });
 
-router.get('/lectureId/:lectureId', async (req, res) => {
+router.get('/lectureId/:lectureId', async (req, res, next) => {
     try {
         const lecture = await db.collection('lectures').find({ '_id': new ObjectID(req.params.lectureId) }).toArray();
+        if (!lecture) {
+            next();
+        }
+        else {
+            res.json(lecture);
+            await asyncLog(logger, 'info', `Success for lectureId: ${req.params.lectureId}`);
+        }
+    }
+    catch(err) {
+        res.sendStatus(400);
+        await asyncLog(logger, 'error', `DATABASE ERROR! CHECK IF SERVER IS CONNECTED TO THE DATABASE.`);
+    }
+});
+
+router.get('/lectureId/:lectureId', async (req, res) => {
+    try {
+        let lecture;
+
+        legacyDBs.forEach(db => {
+            lecture = await db.collection('lectures').find({ '_id': new ObjectID(req.params.lectureId) }).toArray();
+        });
+
         if (!lecture) {
             res.sendStatus(400);
             await asyncLog(logger, 'error', `Cant find lecture with lectureID: ${req.params.lectureId}.`);
