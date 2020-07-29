@@ -12,7 +12,9 @@ let db;
 // DATABASE RELATED STRINGS
 const databaseUri = config.databaseUri;
 const databaseName = config.databaseName;
-const legacyDatabaseNames = config.legacyDatabaseNames;
+// const legacyDatabaseNames = config.legacyDatabaseNames;
+const currentCollectionName = config.currentCollectionName;
+const oldCollectionsNames = config.oldCollectionsNames
 
 // DATABASE CONNECTION
 MongoClient.connect(databaseUri, {useUnifiedTopology: true}, (err, client) => {
@@ -20,7 +22,7 @@ MongoClient.connect(databaseUri, {useUnifiedTopology: true}, (err, client) => {
         throw err;
     }
     db = client.db(databaseName);
-    legacyDBs = legacyDatabaseNames.map(dbName => client.db(dbName));
+    // legacyDBs = legacyDatabaseNames.map(dbName => client.db(dbName));
 });
 
 // CREATE LOGGER
@@ -40,7 +42,7 @@ const logger = winston.createLogger({
 router.get('/title/:title', async (req, res, next) => {
     // Query without manipulating user input (eg: 수학, 수학 1)
     try {                        
-        const lectures = await db.collection('lectures').find({ '교과목명': new RegExp(req.params.title) }).toArray();
+        const lectures = await db.collection(currentCollectionName).find({ '교과목명': new RegExp(req.params.title) }).toArray();
 
         if (lectures.length === 0) {
             next();
@@ -59,7 +61,7 @@ router.get('/title/:title', async (req, res, next) => {
 router.get('/title/:title', async (req, res) => {
     // Query for when the user didn't put spaces at the right place (eg: 수학1)
     try {
-        const lectures = await db.collection('lectures').find().toArray();
+        const lectures = await db.collection(currentCollectionName).find().toArray();
         
         const cleanedTitleData = new RegExp(req.params.title.split(' ').join(''));
         const lecturesToSend = lectures.filter(item => cleanedTitleData.test(item['교과목명'].split(' ').join('')) === true);
@@ -83,7 +85,7 @@ router.get('/code/:code', async (req, res) => {
     try {
         const cleanedCodeData = req.params.code.split(' ').join('').toUpperCase();
         
-        const lectures = await db.collection('lectures').find({ '교과목번호': cleanedCodeData }).toArray();
+        const lectures = await db.collection(currentCollectionName).find({ '교과목번호': cleanedCodeData }).toArray();
         if (lectures.length === 0) {
             res.sendStatus(400);
             await asyncLog(logger, 'error', `Fail for CODE: ${req.params.code}, CLEANED_CODE: ${cleanedCodeData}`);
@@ -101,14 +103,15 @@ router.get('/code/:code', async (req, res) => {
 
 router.get('/lectureId/:lectureId', async (req, res, next) => {
     try {
-        const lecture = await db.collection('lectures').find({ '_id': new ObjectID(req.params.lectureId) }).toArray();
-        if (!lecture) {
+        const lecture = await db.collection(currentCollectionName).find({ '_id': new ObjectID(req.params.lectureId) }).toArray();
+        
+        if (lecture.length === 0) {
             next();
         }
         else {
             res.json(lecture);
             await asyncLog(logger, 'info', `Success for lectureId: ${req.params.lectureId}`);
-        }
+        } 
     }
     catch(err) {
         res.sendStatus(400);
@@ -120,11 +123,11 @@ router.get('/lectureId/:lectureId', async (req, res) => {
     try {
         let lecture;
 
-        legacyDBs.forEach(db => {
-            lecture = await db.collection('lectures').find({ '_id': new ObjectID(req.params.lectureId) }).toArray();
-        });
+        for (oldCollectionName of oldCollectionsNames) {
+            lecture = await db.collection(oldCollectionName).find({ '_id': new ObjectID(req.params.lectureId) }).toArray();
+        }
 
-        if (!lecture) {
+        if (lecture.length === 0 || lecture === undefined) {
             res.sendStatus(400);
             await asyncLog(logger, 'error', `Cant find lecture with lectureID: ${req.params.lectureId}.`);
         }
@@ -173,8 +176,8 @@ router.post('/delete/', async (req, res, next) => {
 
 router.post('/delete/', async (req, res) => {
     try {
-        legacyDBs.forEach(async db => {
-            await db.collection('lectures').updateOne(
+        oldCollectionsNames.forEach(async oldCollectionName => {
+            await db.collection(oldCollectionName).updateOne(
                 { '_id': new ObjectID(req.body.lectureId) },
                 { '$pull': { 'users': String(req.body.userId) } }
             );
