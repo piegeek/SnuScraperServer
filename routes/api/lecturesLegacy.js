@@ -176,12 +176,13 @@ router.post('/delete/', async (req, res, next) => {
 
 router.post('/delete/', async (req, res) => {
     try {
-        oldCollectionsNames.forEach(async oldCollectionName => {
+        for (oldCollectionName of oldCollectionsNames) {
             await db.collection(oldCollectionName).updateOne(
                 { '_id': new ObjectID(req.body.lectureId) },
                 { '$pull': { 'users': String(req.body.userId) } }
             );
-        });
+        }
+
         res.sendStatus(200);
         await asyncLog(logger, 'info', `Successfully deleted user('id': ${req.body.userId}) from lecture('id': ${req.body.lectureId})`);
     }
